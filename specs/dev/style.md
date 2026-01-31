@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.xyz> -->
+<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
 
 # STYLE: Authoring Conventions
 
@@ -59,12 +59,12 @@ Each applicable file shall include SPDX headers in the first comment block (afte
 
 ```markdown
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.xyz> -->
+<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
 ```
 
 **TypeScript/JavaScript**:
 
 ```typescript
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.xyz>
+// SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai>
 ```
