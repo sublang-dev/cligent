@@ -33,7 +33,7 @@ interface AgentEvent {
 async function* runAgent(agent: string, prompt: string, options?: AgentOptions): AsyncGenerator<AgentEvent>;
 ```
 
-The key architectural choice is that all adapters emit a **common event structure** (with its final design in later decisions), allowing UI layers to render replies uniformly.
+The key architectural choice is that all adapters emit a **common event structure** (with its final design in [DR-002](002-unified-event-stream-and-adapter-interface.md)), allowing UI layers to render replies uniformly.
 
 ## Architecture
 

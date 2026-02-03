@@ -9,7 +9,7 @@ Proposed
 
 ## Context
 
-DR-001 established the architectural direction: a TypeScript library with async generator interface across CLI agents. This decision defines the concrete interface design—event types, adapter contract, and permission model.
+[DR-001](001-unified-cli-agent-interface-architecture.md) established the architectural direction: a TypeScript library with async generator interface across CLI agents. This decision defines the concrete interface design—event types, adapter contract, and permission model.
 
 ## Decision
 
@@ -26,6 +26,7 @@ DR-001 established the architectural direction: a TypeScript library with async 
 ```
 
 The core normalizes heterogeneous agent outputs into a **Unified Event Stream (UES)**.
+Adapter implementations should align with vendor CLI documentation and repositories for event mapping and option semantics (Claude Code [^1][^2], Codex CLI [^3][^4], Gemini CLI [^5], OpenCode [^6]).
 
 ### Unified Event Stream
 
@@ -190,7 +191,7 @@ async function* runParallel(
 - **Permission hooks** via `canUseTool` require SDK-based adapters or interactive mode
 - **Tool filtering** via `allowedTools`/`disallowedTools` supported by all agents; implementation varies (CLI flags, permissions config, policy engine)
 - **Budgeting**: `maxTurns` supported by Claude Code, OpenCode (`steps`), Gemini (`maxSessionTurns`); `maxBudgetUsd` only by Claude Code
-- **MCP integration** deferred to adapter implementation
+- **MCP integration** deferred to adapter implementation [^7]
 - **Extensibility** via namespaced events, `metadata`, and `capabilities` fields
 
 ## References
