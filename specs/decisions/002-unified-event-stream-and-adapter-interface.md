@@ -5,7 +5,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -53,15 +53,15 @@ type AgentEventType =
   | 'init' | 'text' | 'text_delta' | 'tool_use' | 'tool_result'
   | 'thinking' | 'error' | 'permission_request' | 'done';
 
+type AgentType = 'claude-code' | 'codex' | 'gemini' | 'opencode' | string;
+
 interface BaseEvent {
   type: AgentEventType | string;  // string allows namespaced extensions
-  agent: AgentId;
+  agent: AgentType;
   timestamp: number;
   sessionId: string;
   metadata?: Record<string, unknown>;  // vendor-specific fields
 }
-
-type AgentId = 'claude-code' | 'codex' | 'gemini' | 'opencode' | string;
 ```
 
 #### Key Payloads
@@ -72,6 +72,31 @@ interface InitPayload {
   cwd: string;
   tools: string[];
   capabilities?: Record<string, unknown>;  // feature discovery
+}
+
+interface TextPayload {
+  content: string;
+}
+
+interface TextDeltaPayload {
+  delta: string;
+}
+
+interface ThinkingPayload {
+  summary: string;
+}
+
+interface ErrorPayload {
+  code?: string;
+  message: string;
+  recoverable: boolean;
+}
+
+interface PermissionRequestPayload {
+  toolName: string;
+  toolUseId: string;
+  input: Record<string, unknown>;
+  reason?: string;
 }
 
 interface ToolUsePayload {
@@ -100,6 +125,18 @@ interface DonePayload {
   };
   durationMs: number;
 }
+
+type AgentEvent =
+  | (BaseEvent & { type: 'init'; payload: InitPayload })
+  | (BaseEvent & { type: 'text'; payload: TextPayload })
+  | (BaseEvent & { type: 'text_delta'; payload: TextDeltaPayload })
+  | (BaseEvent & { type: 'tool_use'; payload: ToolUsePayload })
+  | (BaseEvent & { type: 'tool_result'; payload: ToolResultPayload })
+  | (BaseEvent & { type: 'thinking'; payload: ThinkingPayload })
+  | (BaseEvent & { type: 'error'; payload: ErrorPayload })
+  | (BaseEvent & { type: 'permission_request'; payload: PermissionRequestPayload })
+  | (BaseEvent & { type: 'done'; payload: DonePayload })
+  | (BaseEvent & { type: `${string}:${string}`; payload: unknown });
 ```
 
 Adapters should emit `init` first when possible to establish capabilities.
@@ -130,8 +167,7 @@ Adapters translate these primitives to vendor-specific controls where supported 
 
 ```typescript
 interface AgentAdapter {
-  readonly id: AgentId;
-  readonly name: string;
+  readonly agent: AgentType;
 
   run(
     prompt: string,
@@ -154,7 +190,7 @@ interface AgentOptions {
 }
 ```
 
-Tool filtering: if `allowedTools` is set, only listed tools are available; `disallowedTools` further excludes from that set. Adapters should emit `permission_request` when user decision is required and handle approvals via adapter-native mechanisms (SDK callbacks, CLI prompts). Headless adapters may not support interactive approvals.
+Tool filtering: if `allowedTools` is set, only listed tools are available; `disallowedTools` further excludes from that set. Tool names are exact identifiers unless an adapter explicitly documents pattern support. Adapters should emit `permission_request` when user decision is required and handle approvals via adapter-native mechanisms (SDK callbacks, CLI prompts). Headless adapters may not support interactive approvals.
 
 ### Session Control
 
@@ -174,7 +210,7 @@ controller.abort();
 async function* runParallel(
   tasks: Array<{ adapter: AgentAdapter; prompt: string; options?: AgentOptions }>
 ): AsyncGenerator<AgentEvent> {
-  // Merge streams, events tagged by adapter.id
+  // Merge streams, events tagged by adapter.agent
 }
 ```
 
