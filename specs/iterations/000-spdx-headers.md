@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
+<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai> -->
 
 # IR-000: SPDX Headers
 
@@ -34,22 +34,22 @@ Add SPDX headers (license and copyright info) to applicable files.
    >
    > ```typescript
    > // SPDX-License-Identifier: Apache-2.0
-   > // SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai>
+   > // SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
    > ```
    >
    > ```markdown
    > <!-- SPDX-License-Identifier: Apache-2.0 -->
-   > <!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
+   > <!-- SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai> -->
    > ```
    >
    > **Contents** (README, docs, blogs, etc.):
    >
    > ```markdown
    > <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-   > <!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
+   > <!-- SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai> -->
    > ```
 
-## Acceptance Criteria
+## Verification
 
 - All source files have SPDX-FileCopyrightText header ([SPDX-001](../test/spdx-headers.md#spdx-001-copyright-header-presence))
 - Files have SPDX-License-Identifier if a license file exists ([SPDX-002](../test/spdx-headers.md#spdx-002-license-header-presence))

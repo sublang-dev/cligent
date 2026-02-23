@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
+<!-- SPDX-FileCopyrightText: 2025 SubLang International <https://sublang.ai> -->
 
 # DR-000: Initial Specs Structure
 
@@ -13,22 +13,13 @@ Projects need a standardized structure and format for specifications to support 
 
 ## Decision
 
-Use `iteron scaffold` to create:
-
-```text
-specs/
-├── decisions/    # Decision Records (DRs)
-├── iterations/   # Iteration Records (IRs)
-├── user/         # User-facing specs
-├── dev/          # Development specs
-└── test/         # Verification specs
-```
+Use `boss scaffold` to create the following.
 
 ### Records
 
 | Directory | Format | Naming |
 | --------- | ------- | ------ |
-| decisions/ | [ADR](https://adr.github.io/) (Architectural Decision Record) | `NNN-<kebab-case-title>.md` |
+| decisions/ | [ADR](https://github.com/npryce/adr-tools) (Architectural Decision Record) | `NNN-<kebab-case-title>.md` |
 | iterations/ | Goal, deliverables, tasks, verification | `NNN-<kebab-case-title>.md` |
 
 ### Specs
@@ -62,6 +53,7 @@ Test specs map Given-When-Then: Given → Where+While, When → When, Then → s
 
 | Path | Content |
 | ---- | ------- |
+| `spec-map.md` | Spec index for navigation (non-normative) |
 | `decisions/000-initial-specs-structure.md` | This DR |
 | `iterations/000-spdx-headers.md` | Initial IR |
 | `user/meta.md` | GEARS syntax guide |

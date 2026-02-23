@@ -1,5 +1,5 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
+<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai> -->
 
 # STYLE: Authoring Conventions
 
@@ -27,44 +27,57 @@ Each item shall use GEARS syntax per [META-001](../user/meta.md#meta-001) and be
 
 Item IDs shall not be modified once committed; new items shall use higher IDs.
 
-## Cross-References
+## Record Format
 
 ### STYLE-005
 
-Cross-references to specific items shall use relative links with anchors (e.g., `[STYLE-001](style.md#style-001)`).
+Decision records shall follow [ADR](https://github.com/npryce/adr-tools) format with Status, Context, Decision, and Consequences sections, written concisely.
 
 ### STYLE-006
 
-Iterations shall cite relevant specs.
+When references are appropriate, decision records shall cite authoritative sources (e.g., official docs) with numbered markers (e.g., `[1]`) linked to specific URLs in a `## References` section that has no uncited entries.
 
 ### STYLE-007
 
-Specs shall cite decisions when deriving from them.
+Iteration records shall include Goal, Deliverables, Tasks, and Verification sections.
+
+## Cross-References
 
 ### STYLE-008
 
-Specs shall not cite iterations.
+Cross-references to specific items shall use relative links with anchors (e.g., `[STYLE-001](style.md#style-001)`).
 
 ### STYLE-009
+
+Iterations shall not be cited by decisions or specs.
+
+### STYLE-010
 
 Test specs shall not be cited by other specs.
 
 ## SPDX Headers
 
-### STYLE-010
+### STYLE-011
 
-Each applicable file shall include SPDX headers in the first comment block (after shebang if present), per [SPDX-001](../test/spdx-headers.md#spdx-001-copyright-header-presence) and [SPDX-002](../test/spdx-headers.md#spdx-002-license-header-presence).
+While a file is git-tracked or `git add`-able with comment syntax (see exclusions below), when adding SPDX headers, the file shall include both `SPDX-License-Identifier` and `SPDX-FileCopyrightText` in the first comment block (after shebang if present).
 
-**Markdown** (specs, README, docs):
+#### Exclusions
 
-```markdown
-<!-- SPDX-License-Identifier: Apache-2.0 -->
-<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai> -->
-```
+- No comment syntax: e.g., JSON, binaries
+- Config: e.g., `.gitignore`, `.editorconfig`, `**/settings.json`, `AGENTS.md`, `.github/workflows/ci.yml`, lock files
+- Generated/vendor: e.g., `dist/`, `node_modules/`, vendor directories
+- License/legal documents
 
-**TypeScript/JavaScript**:
+### STYLE-012
+
+Source code files (TypeScript, JavaScript, specs) shall use Apache-2.0 headers:
 
 ```typescript
 // SPDX-License-Identifier: Apache-2.0
-// SPDX-FileCopyrightText: 2026 SubLang International <https://www.sublang.ai>
+// SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
+```
+
+```markdown
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai> -->
 ```
