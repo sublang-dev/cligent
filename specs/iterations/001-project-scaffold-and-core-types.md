@@ -3,18 +3,22 @@
 
 # IR-001: Project Scaffold and Core Types
 
+## Status
+
+Done
+
 ## Goal
 
 Set up the project scaffold (package.json, TypeScript, linting, testing) and define all core TypeScript interfaces from [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md) so that subsequent iterations can build on a compilable, testable foundation.
 
 ## Deliverables
 
-- [ ] `package.json` — ESM package, Node 18+ engine requirement, no runtime dependencies
-- [ ] `tsconfig.json` — strict mode, declaration emit, ESM module resolution
-- [ ] ESLint + Prettier configuration
-- [ ] `src/types.ts` — all [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md) TypeScript interfaces
-- [ ] `src/index.ts` — package entry point re-exporting all types
-- [ ] Vitest setup with type-level tests
+- [x] `package.json` — ESM package, Node 18+ engine requirement, no runtime dependencies
+- [x] `tsconfig.json` — strict mode, declaration emit, ESM module resolution
+- [x] ESLint + Prettier configuration
+- [x] `src/types.ts` — all [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md) TypeScript interfaces
+- [x] `src/index.ts` — package entry point re-exporting all types
+- [x] Vitest setup with type-level tests
 
 ## Tasks
 
