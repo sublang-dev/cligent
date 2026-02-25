@@ -18,8 +18,9 @@ Implement the Claude Code adapter using `@anthropic-ai/claude-agent-sdk`, normal
 
 1. **Implement `ClaudeCodeAdapter`** (`src/adapters/claude-code.ts`)
    - Implements `AgentAdapter` with `agent: 'claude-code'`
-   - `isAvailable()` — checks if `@anthropic-ai/claude-agent-sdk` is importable
-   - `run()` — calls SDK `query()` and yields normalized events
+   - Lazy-loads `@anthropic-ai/claude-agent-sdk` via dynamic `import()` — the adapter module itself must load without the SDK installed so consumers can register it unconditionally
+   - `isAvailable()` — attempts dynamic `import()` of the SDK; returns `true` if it resolves, `false` otherwise
+   - `run()` — lazy-loads SDK, calls `query()`, and yields normalized events; throws if SDK is not installed
 
 2. **SDKMessage → AgentEvent normalization**
    - `system` message → `init` event (extract model, cwd, tools)

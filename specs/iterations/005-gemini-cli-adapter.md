@@ -20,7 +20,7 @@ Implement the Gemini CLI adapter by spawning the `gemini` CLI process and parsin
    - Async generator that accepts a `Readable` stream
    - Handles line buffering (partial lines across chunks)
    - Parses each newline-delimited JSON line
-   - Yields parsed objects; emits errors for malformed lines without stopping the stream
+   - Yields parsed objects; malformed lines yield a `{ ok: false, error: string, raw: string }` discriminated result (valid lines yield `{ ok: true, data: unknown }`) so the consumer can handle parse errors without a side channel
 
 2. **Implement `GeminiAdapter`** (`src/adapters/gemini.ts`)
    - Implements `AgentAdapter` with `agent: 'gemini'`
@@ -34,6 +34,7 @@ Implement the Gemini CLI adapter by spawning the `gemini` CLI process and parsin
    - `tool_result` event → `tool_result` event
    - `error` event → `error` event
    - `result` event → `done` event with usage stats
+   - `parseNDJSON()` `{ ok: false }` result → `error` event with `recoverable: true` and `message` containing the parse error and raw line; stream continues
 
 4. **Exit code mapping**
    - `0` → `done` with status `'success'`
@@ -49,6 +50,7 @@ Implement the Gemini CLI adapter by spawning the `gemini` CLI process and parsin
 
 6. **AbortSignal → process termination**
    - `abortSignal` listener sends `SIGTERM` to the spawned process
+   - On process exit after SIGTERM, yield `done` event with `status: 'interrupted'`
    - Clean up: handle process exit and stream close
 
 7. **Configure sub-path export**
@@ -58,6 +60,7 @@ Implement the Gemini CLI adapter by spawning the `gemini` CLI process and parsin
    - Mock `child_process.spawn` with canned NDJSON output
    - Test `parseNDJSON()` with complete lines, partial lines, and malformed JSON
    - Verify each Gemini NDJSON event type maps to the correct AgentEvent type
+   - Verify malformed NDJSON lines produce `error` events with `recoverable: true`
    - Verify exit code → done status mapping
    - Verify UPM → CLI flag mapping
    - Verify AbortSignal sends SIGTERM and yields appropriate done event

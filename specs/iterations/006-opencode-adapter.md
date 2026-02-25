@@ -19,8 +19,9 @@ Implement the OpenCode adapter using `@opencode-ai/sdk`, supporting both managed
 
 1. **Implement `OpenCodeAdapter`** (`src/adapters/opencode.ts`)
    - Implements `AgentAdapter` with `agent: 'opencode'`
-   - `isAvailable()` — checks if `@opencode-ai/sdk` is importable; in managed mode also checks `opencode` CLI on PATH via spawn-based probe
-   - `run()` — connects to or spawns OpenCode server, subscribes to SSE stream, yields normalized events
+   - Lazy-loads `@opencode-ai/sdk` via dynamic `import()` — the adapter module itself must load without the SDK installed so consumers can register it unconditionally
+   - `isAvailable()` — attempts dynamic `import()` of the SDK; in managed mode also checks `opencode` CLI on PATH via spawn-based probe; returns `true` only if all checks pass
+   - `run()` — lazy-loads SDK, connects to or spawns OpenCode server, subscribes to SSE stream, yields normalized events; throws if SDK is not installed
 
 2. **Client-server architecture**
    - **Managed mode** (default): spawn `opencode` server process, connect SDK client
@@ -51,8 +52,9 @@ Implement the OpenCode adapter using `@opencode-ai/sdk`, supporting both managed
 
 6. **Server lifecycle management**
    - Managed mode: spawn server, wait for ready, connect client
-   - On abort or completion: gracefully shut down managed server
-   - Handle server crashes with `error` event and cleanup
+   - On abort: yield `done` event with `status: 'interrupted'`, then gracefully shut down managed server
+   - On completion: gracefully shut down managed server
+   - Handle server crashes with `error` event + `done` event (`status: 'error'`) and cleanup
 
 7. **Configure sub-path export**
    - Add `"./adapters/opencode"` to package.json `"exports"` map

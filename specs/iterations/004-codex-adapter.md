@@ -19,8 +19,9 @@ Implement the Codex adapter using `@openai/codex-sdk`, normalizing Codex events 
 
 1. **Implement `CodexAdapter`** (`src/adapters/codex.ts`)
    - Implements `AgentAdapter` with `agent: 'codex'`
-   - `isAvailable()` — checks if `@openai/codex-sdk` is importable
-   - `run()` — creates Codex instance, calls `startThread()` + `run()`, yields normalized events via `runStreamed()`
+   - Lazy-loads `@openai/codex-sdk` via dynamic `import()` — the adapter module itself must load without the SDK installed so consumers can register it unconditionally
+   - `isAvailable()` — attempts dynamic `import()` of the SDK; returns `true` if it resolves, `false` otherwise
+   - `run()` — lazy-loads SDK, creates Codex instance, calls `startThread()` + `run()`, yields normalized events via `runStreamed()`; throws if SDK is not installed
 
 2. **Codex events → AgentEvent normalization**
    - `item.completed` (text content) → `text` event
