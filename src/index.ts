@@ -20,3 +20,9 @@ export type {
   AgentAdapter,
   AgentOptions,
 } from './types.js';
+
+export { AdapterRegistry } from './registry.js';
+export { runAgent, runParallel } from './engine.js';
+export type { ParallelTask } from './engine.js';
+export { createEvent, generateSessionId, isAgentEvent } from './events.js';
+export type { AgentEventMap } from './events.js';

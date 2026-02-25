@@ -1,0 +1,351 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: 2026 SubLang International <https://sublang.ai>
+
+import type {
+  AgentType,
+  AgentEvent,
+  AgentAdapter,
+  AgentOptions,
+} from './types.js';
+import { createEvent, generateSessionId } from './events.js';
+import type { AdapterRegistry } from './registry.js';
+
+export interface ParallelTask {
+  adapter: AgentAdapter;
+  prompt: string;
+  options?: AgentOptions;
+}
+
+function safeReturn(gen: AsyncGenerator<AgentEvent, void, void>): void {
+  try {
+    gen.return(undefined as never).catch(() => {});
+  } catch {
+    // swallow synchronous cleanup errors
+  }
+}
+
+function raceAbort(
+  promise: Promise<IteratorResult<AgentEvent, void>>,
+  signal: AbortSignal | undefined,
+): Promise<IteratorResult<AgentEvent, void>> {
+  if (!signal || signal.aborted) {
+    if (signal?.aborted) {
+      return Promise.resolve({ done: true, value: undefined });
+    }
+    return promise;
+  }
+  return Promise.race([
+    promise,
+    new Promise<IteratorResult<AgentEvent, void>>((resolve) => {
+      const onAbort = () => resolve({ done: true, value: undefined });
+      signal.addEventListener('abort', onAbort, { once: true });
+      promise.then(
+        () => signal.removeEventListener('abort', onAbort),
+        () => signal.removeEventListener('abort', onAbort),
+      );
+    }),
+  ]);
+}
+
+function makeSynthDone(
+  agent: AgentType,
+  status: 'error' | 'interrupted',
+  sessionId: string,
+  startTime: number,
+): AgentEvent {
+  return createEvent(
+    'done',
+    agent,
+    {
+      status,
+      usage: { inputTokens: 0, outputTokens: 0, toolUses: 0 },
+      durationMs: Date.now() - startTime,
+    },
+    sessionId,
+  );
+}
+
+function makeSynthError(
+  agent: AgentType,
+  code: string,
+  message: string,
+  sessionId: string,
+): AgentEvent {
+  return createEvent(
+    'error',
+    agent,
+    { code, message, recoverable: false },
+    sessionId,
+  );
+}
+
+export async function* runAgent(
+  agent: AgentType,
+  prompt: string,
+  options: AgentOptions | undefined,
+  registry: AdapterRegistry,
+): AsyncGenerator<AgentEvent, void, void> {
+  const adapter = registry.get(agent);
+  if (!adapter) {
+    throw new Error(`No adapter registered for agent: ${agent}`);
+  }
+
+  const sessionId = generateSessionId();
+  const startTime = Date.now();
+  const signal = options?.abortSignal;
+  const gen = adapter.run(prompt, options);
+  let doneYielded = false;
+
+  try {
+    while (true) {
+      let result: IteratorResult<AgentEvent, void>;
+      try {
+        result = await raceAbort(gen.next(), signal);
+      } catch (err) {
+        // Adapter threw
+        if (!doneYielded) {
+          const msg = err instanceof Error ? err.message : String(err);
+          yield makeSynthError(agent, 'ADAPTER_ERROR', msg, sessionId);
+          yield makeSynthDone(agent, 'error', sessionId, startTime);
+        }
+        safeReturn(gen);
+        return;
+      }
+
+      // Check abort after awaiting
+      if (signal?.aborted) {
+        if (!doneYielded) {
+          yield makeSynthDone(agent, 'interrupted', sessionId, startTime);
+        }
+        safeReturn(gen);
+        return;
+      }
+
+      if (result.done) {
+        // Generator exhausted
+        if (!doneYielded) {
+          yield makeSynthError(
+            agent,
+            'MISSING_DONE',
+            'Protocol violation: adapter completed without terminal event',
+            sessionId,
+          );
+          yield makeSynthDone(agent, 'error', sessionId, startTime);
+        }
+        return;
+      }
+
+      const event = result.value;
+
+      if (doneYielded) {
+        // Suppress all post-done events
+        continue;
+      }
+
+      yield event;
+
+      if (event.type === 'done') {
+        doneYielded = true;
+        safeReturn(gen);
+        return;
+      }
+    }
+  } finally {
+    // Ensure generator is cleaned up
+    if (!doneYielded) {
+      safeReturn(gen);
+    }
+  }
+}
+
+interface AdapterState {
+  gen: AsyncGenerator<AgentEvent, void, void>;
+  agent: AgentType;
+  startTime: number;
+  sessionId: string;
+  doneYielded: boolean;
+}
+
+interface RaceResult {
+  index: number;
+  result?: IteratorResult<AgentEvent, void>;
+  error?: unknown;
+  isError: boolean;
+}
+
+export async function* runParallel(
+  tasks: ParallelTask[],
+): AsyncGenerator<AgentEvent, void, void> {
+  if (tasks.length === 0) return;
+
+  const states: (AdapterState | null)[] = tasks.map((task) => ({
+    gen: task.adapter.run(task.prompt, task.options),
+    agent: task.adapter.agent,
+    startTime: Date.now(),
+    sessionId: generateSessionId(),
+    doneYielded: false,
+  }));
+
+  const pending = new Map<number, Promise<RaceResult>>();
+
+  function scheduleNext(index: number): void {
+    const state = states[index];
+    if (!state) return;
+    pending.set(
+      index,
+      state.gen.next().then(
+        (result) => ({ index, result, isError: false }),
+        (error: unknown) => ({ index, error, isError: true }),
+      ),
+    );
+  }
+
+  // Collect all abort signals and build a single abort promise
+  const signals = tasks
+    .map((t) => t.options?.abortSignal)
+    .filter((s): s is AbortSignal => s !== undefined);
+
+  const abortSentinel: RaceResult = { index: -1, isError: false };
+  let resolveAbort: (() => void) | undefined;
+  const abortPromise = new Promise<RaceResult>((resolve) => {
+    resolveAbort = () => resolve(abortSentinel);
+  });
+
+  const abortCleanups: (() => void)[] = [];
+  let aborted = false;
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      aborted = true;
+    } else {
+      const onAbort = () => {
+        aborted = true;
+        resolveAbort?.();
+      };
+      signal.addEventListener('abort', onAbort, { once: true });
+      abortCleanups.push(() => signal.removeEventListener('abort', onAbort));
+    }
+  }
+
+  function cleanupAbort(): void {
+    for (const cleanup of abortCleanups) cleanup();
+  }
+
+  function yieldInterruptedAndCleanup(): AgentEvent[] {
+    const events: AgentEvent[] = [];
+    for (const state of states) {
+      if (state && !state.doneYielded) {
+        events.push(
+          makeSynthDone(
+            state.agent,
+            'interrupted',
+            state.sessionId,
+            state.startTime,
+          ),
+        );
+        state.doneYielded = true;
+        safeReturn(state.gen);
+      }
+    }
+    return events;
+  }
+
+  // Handle pre-aborted
+  if (aborted) {
+    for (const evt of yieldInterruptedAndCleanup()) yield evt;
+    cleanupAbort();
+    return;
+  }
+
+  // Start initial promises
+  for (let i = 0; i < states.length; i++) {
+    scheduleNext(i);
+  }
+
+  try {
+    while (pending.size > 0) {
+      const raceResult = await Promise.race([...pending.values(), abortPromise]);
+
+      if (raceResult === abortSentinel || aborted) {
+        for (const evt of yieldInterruptedAndCleanup()) yield evt;
+        return;
+      }
+
+      const { index } = raceResult;
+      pending.delete(index);
+      const state = states[index]!;
+
+      if (raceResult.isError) {
+        // Adapter threw
+        if (!state.doneYielded) {
+          const msg =
+            raceResult.error instanceof Error
+              ? raceResult.error.message
+              : String(raceResult.error);
+          yield makeSynthError(
+            state.agent,
+            'ADAPTER_ERROR',
+            msg,
+            state.sessionId,
+          );
+          yield makeSynthDone(
+            state.agent,
+            'error',
+            state.sessionId,
+            state.startTime,
+          );
+          state.doneYielded = true;
+        }
+        safeReturn(state.gen);
+        states[index] = null;
+        continue;
+      }
+
+      const result = raceResult.result!;
+      if (result.done) {
+        // Generator exhausted
+        if (!state.doneYielded) {
+          yield makeSynthError(
+            state.agent,
+            'MISSING_DONE',
+            'Protocol violation: adapter completed without terminal event',
+            state.sessionId,
+          );
+          yield makeSynthDone(
+            state.agent,
+            'error',
+            state.sessionId,
+            state.startTime,
+          );
+          state.doneYielded = true;
+        }
+        states[index] = null;
+        continue;
+      }
+
+      const event = result.value;
+
+      if (state.doneYielded) {
+        // Suppress post-done events
+        scheduleNext(index);
+        continue;
+      }
+
+      yield event;
+
+      if (event.type === 'done') {
+        state.doneYielded = true;
+        safeReturn(state.gen);
+        states[index] = null;
+        continue;
+      }
+
+      scheduleNext(index);
+    }
+  } finally {
+    for (const cleanup of abortCleanups) cleanup();
+    for (const state of states) {
+      if (state) safeReturn(state.gen);
+    }
+  }
+}
