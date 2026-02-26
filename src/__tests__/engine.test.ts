@@ -230,6 +230,143 @@ describe('runAgent', () => {
     ).toBe('error');
   });
 
+  it('pre-aborted signal does not execute adapter body', async () => {
+    let adapterBodyRan = false;
+    const adapter: AgentAdapter = {
+      agent: 'claude-code',
+      async *run(): AsyncGenerator<AgentEvent, void, void> {
+        adapterBodyRan = true;
+        yield textEvent('claude-code', 'should not happen');
+        yield doneEvent('claude-code');
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+    const registry = new AdapterRegistry();
+    registry.register(adapter);
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const events = await collectEvents(
+      runAgent('claude-code', 'hi', { abortSignal: controller.signal }, registry),
+    );
+
+    expect(adapterBodyRan).toBe(false);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('done');
+    expect(
+      (events[0] as AgentEvent & { payload: { status: string } }).payload.status,
+    ).toBe('interrupted');
+  });
+
+  it('pre-aborted signal does not call adapter.run()', async () => {
+    let runCalled = false;
+    const adapter: AgentAdapter = {
+      agent: 'claude-code',
+      run(): AsyncGenerator<AgentEvent, void, void> {
+        runCalled = true;
+        return (async function* () {
+          yield textEvent('claude-code', 'hi');
+          yield doneEvent('claude-code');
+        })();
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+    const registry = new AdapterRegistry();
+    registry.register(adapter);
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const events = await collectEvents(
+      runAgent('claude-code', 'hi', { abortSignal: controller.signal }, registry),
+    );
+
+    expect(runCalled).toBe(false);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('done');
+  });
+
+  it('no unhandled rejection with pre-aborted signal and throwing adapter', async () => {
+    const rejections: unknown[] = [];
+    const handler = (reason: unknown) => rejections.push(reason);
+    process.on('unhandledRejection', handler);
+
+    const adapter: AgentAdapter = {
+      agent: 'claude-code',
+      async *run(): AsyncGenerator<AgentEvent, void, void> {
+        throw new Error('boom-first-next');
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+    const registry = new AdapterRegistry();
+    registry.register(adapter);
+
+    const controller = new AbortController();
+    controller.abort();
+
+    const events = await collectEvents(
+      runAgent('claude-code', 'hi', { abortSignal: controller.signal }, registry),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+
+    process.removeListener('unhandledRejection', handler);
+
+    expect(events.some((e) => e.type === 'done')).toBe(true);
+    expect(rejections).toHaveLength(0);
+  });
+
+  it('synthesized events preserve adapter sessionId', async () => {
+    const SID = 'adapter-session-abc';
+    const adapter: AgentAdapter = {
+      agent: 'claude-code',
+      async *run(): AsyncGenerator<AgentEvent, void, void> {
+        yield createEvent('text', 'claude-code', { content: 'hi' }, SID);
+        throw new Error('crash');
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+    const registry = new AdapterRegistry();
+    registry.register(adapter);
+
+    const events = await collectEvents(
+      runAgent('claude-code', 'hi', undefined, registry),
+    );
+    for (const e of events) {
+      expect(e.sessionId).toBe(SID);
+    }
+  });
+
+  it('synthesized MISSING_DONE preserves adapter sessionId', async () => {
+    const SID = 'adapter-session-xyz';
+    const adapter: AgentAdapter = {
+      agent: 'claude-code',
+      async *run(): AsyncGenerator<AgentEvent, void, void> {
+        yield createEvent('text', 'claude-code', { content: 'hi' }, SID);
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+    const registry = new AdapterRegistry();
+    registry.register(adapter);
+
+    const events = await collectEvents(
+      runAgent('claude-code', 'hi', undefined, registry),
+    );
+    for (const e of events) {
+      expect(e.sessionId).toBe(SID);
+    }
+  });
+
   it('yields exactly one done when abort races adapter done', async () => {
     const controller = new AbortController();
     const adapter: AgentAdapter = {
@@ -399,6 +536,106 @@ describe('runParallel', () => {
             'success',
       ),
     ).toBe(true);
+  });
+
+  it('synthesized events preserve per-adapter sessionId', async () => {
+    const SID = 'parallel-adapter-sid';
+    const noDone: AgentAdapter = {
+      agent: 'claude-code',
+      async *run(): AsyncGenerator<AgentEvent, void, void> {
+        yield createEvent('text', 'claude-code', { content: 'hi' }, SID);
+      },
+      async isAvailable() {
+        return true;
+      },
+    };
+
+    const events = await collectEvents(
+      runParallel([{ adapter: noDone, prompt: 'hi' }]),
+    );
+    const ccEvents = events.filter((e) => e.agent === 'claude-code');
+    for (const e of ccEvents) {
+      expect(e.sessionId).toBe(SID);
+    }
+  });
+
+  it('pre-aborted signal does not call adapter.run()', async () => {
+    let runCalled = 0;
+    function makeAdapter(agent: string): AgentAdapter {
+      return {
+        agent,
+        run(): AsyncGenerator<AgentEvent, void, void> {
+          runCalled++;
+          return (async function* () {
+            yield textEvent(agent, 'hi');
+            yield doneEvent(agent);
+          })();
+        },
+        async isAvailable() {
+          return true;
+        },
+      };
+    }
+
+    const controller = new AbortController();
+    controller.abort();
+    const opts: AgentOptions = { abortSignal: controller.signal };
+
+    const events = await collectEvents(
+      runParallel([
+        { adapter: makeAdapter('claude-code'), prompt: 'hi', options: opts },
+        { adapter: makeAdapter('codex'), prompt: 'hi', options: opts },
+      ]),
+    );
+
+    expect(runCalled).toBe(0);
+    const doneEvents = events.filter((e) => e.type === 'done');
+    expect(doneEvents).toHaveLength(2);
+    for (const d of doneEvents) {
+      expect(
+        (d as AgentEvent & { payload: { status: string } }).payload.status,
+      ).toBe('interrupted');
+    }
+  });
+
+  it('any pre-aborted signal cancels all tasks (global cancel)', async () => {
+    let runCalled = 0;
+    function makeAdapter(agent: string): AgentAdapter {
+      return {
+        agent,
+        run(): AsyncGenerator<AgentEvent, void, void> {
+          runCalled++;
+          return (async function* () {
+            yield textEvent(agent, 'hi');
+            yield doneEvent(agent);
+          })();
+        },
+        async isAvailable() {
+          return true;
+        },
+      };
+    }
+
+    const aborted = new AbortController();
+    aborted.abort();
+
+    const events = await collectEvents(
+      runParallel([
+        { adapter: makeAdapter('claude-code'), prompt: 'hi', options: { abortSignal: aborted.signal } },
+        { adapter: makeAdapter('codex'), prompt: 'hi' }, // no signal
+      ]),
+    );
+
+    expect(runCalled).toBe(0);
+    const doneEvents = events.filter((e) => e.type === 'done');
+    expect(doneEvents).toHaveLength(2);
+    expect(doneEvents.some((e) => e.agent === 'claude-code')).toBe(true);
+    expect(doneEvents.some((e) => e.agent === 'codex')).toBe(true);
+    for (const d of doneEvents) {
+      expect(
+        (d as AgentEvent & { payload: { status: string } }).payload.status,
+      ).toBe('interrupted');
+    }
   });
 
   it('empty tasks yields nothing', async () => {

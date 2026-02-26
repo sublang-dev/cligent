@@ -9,11 +9,11 @@ Implement the core engine: an adapter registry for managing agent adapters, the 
 
 ## Deliverables
 
-- [ ] `src/registry.ts` — `AdapterRegistry` class
-- [ ] `src/engine.ts` — `runAgent()` and `runParallel()` functions
-- [ ] `src/events.ts` — event factory helpers (`createEvent`, `generateSessionId`, `isAgentEvent`)
-- [ ] Unit tests with mock adapters
-- [ ] Updated `src/index.ts` exports
+- [x] `src/registry.ts` — `AdapterRegistry` class
+- [x] `src/engine.ts` — `runAgent()` and `runParallel()` functions
+- [x] `src/events.ts` — event factory helpers (`createEvent`, `generateSessionId`, `isAgentEvent`)
+- [x] Unit tests with mock adapters
+- [x] Updated `src/index.ts` exports
 
 ## Tasks
 

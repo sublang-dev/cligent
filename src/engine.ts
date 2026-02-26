@@ -30,6 +30,7 @@ function raceAbort(
 ): Promise<IteratorResult<AgentEvent, void>> {
   if (!signal || signal.aborted) {
     if (signal?.aborted) {
+      promise.catch(() => {}); // suppress unhandled rejection on orphaned promise
       return Promise.resolve({ done: true, value: undefined });
     }
     return promise;
@@ -93,6 +94,14 @@ export async function* runAgent(
   const sessionId = generateSessionId();
   const startTime = Date.now();
   const signal = options?.abortSignal;
+
+  // Short-circuit on pre-aborted signal — never call adapter.run()
+  if (signal?.aborted) {
+    yield makeSynthDone(agent, 'interrupted', sessionId, startTime);
+    return;
+  }
+
+  let lastSessionId = sessionId;
   const gen = adapter.run(prompt, options);
   let doneYielded = false;
 
@@ -105,8 +114,8 @@ export async function* runAgent(
         // Adapter threw
         if (!doneYielded) {
           const msg = err instanceof Error ? err.message : String(err);
-          yield makeSynthError(agent, 'ADAPTER_ERROR', msg, sessionId);
-          yield makeSynthDone(agent, 'error', sessionId, startTime);
+          yield makeSynthError(agent, 'ADAPTER_ERROR', msg, lastSessionId);
+          yield makeSynthDone(agent, 'error', lastSessionId, startTime);
         }
         safeReturn(gen);
         return;
@@ -115,7 +124,7 @@ export async function* runAgent(
       // Check abort after awaiting
       if (signal?.aborted) {
         if (!doneYielded) {
-          yield makeSynthDone(agent, 'interrupted', sessionId, startTime);
+          yield makeSynthDone(agent, 'interrupted', lastSessionId, startTime);
         }
         safeReturn(gen);
         return;
@@ -128,9 +137,9 @@ export async function* runAgent(
             agent,
             'MISSING_DONE',
             'Protocol violation: adapter completed without terminal event',
-            sessionId,
+            lastSessionId,
           );
-          yield makeSynthDone(agent, 'error', sessionId, startTime);
+          yield makeSynthDone(agent, 'error', lastSessionId, startTime);
         }
         return;
       }
@@ -142,6 +151,7 @@ export async function* runAgent(
         continue;
       }
 
+      lastSessionId = event.sessionId;
       yield event;
 
       if (event.type === 'done') {
@@ -178,6 +188,19 @@ export async function* runParallel(
 ): AsyncGenerator<AgentEvent, void, void> {
   if (tasks.length === 0) return;
 
+  // Short-circuit on pre-aborted signal — never call adapter.run()
+  if (tasks.some((t) => t.options?.abortSignal?.aborted)) {
+    for (const task of tasks) {
+      yield makeSynthDone(
+        task.adapter.agent,
+        'interrupted',
+        generateSessionId(),
+        Date.now(),
+      );
+    }
+    return;
+  }
+
   const states: (AdapterState | null)[] = tasks.map((task) => ({
     gen: task.adapter.run(task.prompt, task.options),
     agent: task.adapter.agent,
@@ -212,23 +235,11 @@ export async function* runParallel(
   });
 
   const abortCleanups: (() => void)[] = [];
-  let aborted = false;
 
   for (const signal of signals) {
-    if (signal.aborted) {
-      aborted = true;
-    } else {
-      const onAbort = () => {
-        aborted = true;
-        resolveAbort?.();
-      };
-      signal.addEventListener('abort', onAbort, { once: true });
-      abortCleanups.push(() => signal.removeEventListener('abort', onAbort));
-    }
-  }
-
-  function cleanupAbort(): void {
-    for (const cleanup of abortCleanups) cleanup();
+    const onAbort = () => resolveAbort?.();
+    signal.addEventListener('abort', onAbort, { once: true });
+    abortCleanups.push(() => signal.removeEventListener('abort', onAbort));
   }
 
   function yieldInterruptedAndCleanup(): AgentEvent[] {
@@ -250,13 +261,6 @@ export async function* runParallel(
     return events;
   }
 
-  // Handle pre-aborted
-  if (aborted) {
-    for (const evt of yieldInterruptedAndCleanup()) yield evt;
-    cleanupAbort();
-    return;
-  }
-
   // Start initial promises
   for (let i = 0; i < states.length; i++) {
     scheduleNext(i);
@@ -266,7 +270,7 @@ export async function* runParallel(
     while (pending.size > 0) {
       const raceResult = await Promise.race([...pending.values(), abortPromise]);
 
-      if (raceResult === abortSentinel || aborted) {
+      if (raceResult === abortSentinel) {
         for (const evt of yieldInterruptedAndCleanup()) yield evt;
         return;
       }
@@ -331,6 +335,7 @@ export async function* runParallel(
         continue;
       }
 
+      state.sessionId = event.sessionId;
       yield event;
 
       if (event.type === 'done') {
