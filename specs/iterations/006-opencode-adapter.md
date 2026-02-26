@@ -7,13 +7,17 @@
 
 Implement the OpenCode adapter using `@opencode-ai/sdk`, supporting both managed mode (spawn server) and external mode (connect to URL), normalizing SSE events to the Unified Event Stream and mapping UPM capabilities to OpenCode's permission system — per [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md).
 
+## Status
+
+Done
+
 ## Deliverables
 
-- [ ] `src/adapters/opencode.ts` — `OpenCodeAdapter` implementing `AgentAdapter`
-- [ ] Sub-path export: `cligent/adapters/opencode`
-- [ ] `@opencode-ai/sdk` as optional peer dependency
-- [ ] Extension events: `opencode:file_part`, `opencode:image_part`
-- [ ] Unit tests with mocked SDK
+- [x] `src/adapters/opencode.ts` — `OpenCodeAdapter` implementing `AgentAdapter`
+- [x] Sub-path export: `cligent/adapters/opencode`
+- [x] `@opencode-ai/sdk` as optional peer dependency
+- [x] Extension events: `opencode:file_part`, `opencode:image_part`
+- [x] Unit tests with mocked SDK
 
 ## Tasks
 

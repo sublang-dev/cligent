@@ -22,6 +22,10 @@
     "./adapters/gemini": {
       "import": "./dist/adapters/gemini.js",
       "types": "./dist/adapters/gemini.d.ts"
+    },
+    "./adapters/opencode": {
+      "import": "./dist/adapters/opencode.js",
+      "types": "./dist/adapters/opencode.d.ts"
     }
   },
   "engines": {
@@ -35,13 +39,17 @@
   },
   "peerDependencies": {
     "@anthropic-ai/claude-agent-sdk": "*",
-    "@openai/codex-sdk": "*"
+    "@openai/codex-sdk": "*",
+    "@opencode-ai/sdk": "*"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/claude-agent-sdk": {
       "optional": true
     },
     "@openai/codex-sdk": {
+      "optional": true
+    },
+    "@opencode-ai/sdk": {
       "optional": true
     }
   },
