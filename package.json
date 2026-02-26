@@ -18,6 +18,10 @@
     "./adapters/codex": {
       "import": "./dist/adapters/codex.js",
       "types": "./dist/adapters/codex.d.ts"
+    },
+    "./adapters/gemini": {
+      "import": "./dist/adapters/gemini.js",
+      "types": "./dist/adapters/gemini.d.ts"
     }
   },
   "engines": {

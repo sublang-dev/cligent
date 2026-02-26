@@ -7,12 +7,16 @@
 
 Implement the Gemini CLI adapter by spawning the `gemini` CLI process and parsing its NDJSON stream output, normalizing events to the Unified Event Stream and mapping UPM capabilities to Gemini CLI tool controls — per [DR-001](../decisions/001-unified-cli-agent-interface-architecture.md#gemini-via-stream-parser) and [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md).
 
+## Status
+
+Done
+
 ## Deliverables
 
-- [ ] `src/adapters/gemini.ts` — `GeminiAdapter` implementing `AgentAdapter`
-- [ ] `src/adapters/ndjson.ts` — reusable `parseNDJSON()` async generator utility
-- [ ] Sub-path export: `cligent/adapters/gemini`
-- [ ] Unit tests with mocked child process
+- [x] `src/adapters/gemini.ts` — `GeminiAdapter` implementing `AgentAdapter`
+- [x] `src/adapters/ndjson.ts` — reusable `parseNDJSON()` async generator utility
+- [x] Sub-path export: `cligent/adapters/gemini`
+- [x] Unit tests with mocked child process
 
 ## Tasks
 
