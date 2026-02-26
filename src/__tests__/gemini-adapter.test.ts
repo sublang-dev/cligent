@@ -11,6 +11,7 @@ import { PassThrough } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildGeminiToolSettings,
   GeminiAdapter,
   mapAgentOptionsToGeminiCommand,
   mapPermissionsToGeminiToolConfig,
@@ -334,6 +335,28 @@ describe('GeminiAdapter', () => {
     }
   });
 
+  it('builds Gemini settings with tools.exclude for denied capabilities', () => {
+    const config = mapPermissionsToGeminiToolConfig(
+      {
+        fileWrite: 'deny',
+        shellExecute: 'allow',
+        networkAccess: 'deny',
+      },
+      {
+        allowedTools: ['custom-tool'],
+        disallowedTools: ['blocked-tool'],
+      },
+    );
+
+    const settings = buildGeminiToolSettings(config);
+    expect(settings).toEqual({
+      tools: {
+        core: ['ShellTool', 'custom-tool'],
+        exclude: ['blocked-tool', 'edit', 'webfetch'],
+      },
+    });
+  });
+
   it('maps agent options to Gemini command flags', () => {
     const mapped = mapAgentOptionsToGeminiCommand('build this', {
       cwd: '/repo',
@@ -361,9 +384,41 @@ describe('GeminiAdapter', () => {
       '7',
       '--allowed-tools',
       'ShellTool,custom-tool',
-      '--disallowed-tools',
-      'edit,never-tool',
     ]);
+    expect(mapped.toolConfig.disallowedTools).toEqual(['edit', 'never-tool']);
+  });
+
+  it('passes settings override environment to spawned process', async () => {
+    const { spawnProcess, invocations } = makeSpawn((process) => {
+      writeEventsAndClose(
+        process,
+        [
+          JSON.stringify({
+            type: 'result',
+            status: 'success',
+            usage: { input_tokens: 0, output_tokens: 0, tool_uses: 0 },
+          }),
+        ],
+        0,
+        null,
+      );
+    });
+
+    const adapter = new GeminiAdapter({
+      spawnProcess,
+      probeAvailability: async () => true,
+      createSettingsOverride: async () => ({
+        env: { GEMINI_CLI_SYSTEM_SETTINGS_PATH: '/tmp/gemini-settings.json' },
+        cleanup: async () => {},
+      }),
+    });
+
+    await collect(adapter.run('prompt'));
+
+    expect(invocations).toHaveLength(1);
+    expect(invocations[0]?.options.env?.GEMINI_CLI_SYSTEM_SETTINGS_PATH).toBe(
+      '/tmp/gemini-settings.json',
+    );
   });
 
   it('sends SIGTERM on abort and emits interrupted done status', async () => {

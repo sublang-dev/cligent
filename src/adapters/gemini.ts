@@ -6,6 +6,9 @@ import type {
   ChildProcessWithoutNullStreams,
   SpawnOptionsWithoutStdio,
 } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { createEvent, generateSessionId } from '../events.js';
@@ -43,6 +46,9 @@ interface CloseResult {
 interface GeminiAdapterDeps {
   spawnProcess?: SpawnProcessFn;
   probeAvailability?: () => Promise<boolean>;
+  createSettingsOverride?: (
+    toolConfig: GeminiToolConfig,
+  ) => Promise<GeminiSettingsOverride>;
 }
 
 const CAPABILITY_TOOL_GROUPS: Record<GeminiCapability, string[]> = {
@@ -244,7 +250,7 @@ const execFileAsync = promisify(execFile);
 
 async function defaultProbeAvailability(): Promise<boolean> {
   try {
-    await execFileAsync('gemini', ['--version']);
+    await execFileAsync('gemini', ['--version'], { timeout: 5000 });
     return true;
   } catch {
     return false;
@@ -255,6 +261,57 @@ export interface GeminiToolConfig {
   allowedTools: string[];
   disallowedTools: string[];
   args: string[];
+}
+
+interface GeminiSettingsOverride {
+  env: NodeJS.ProcessEnv;
+  cleanup: () => Promise<void>;
+}
+
+const NOOP_SETTINGS_OVERRIDE: GeminiSettingsOverride = {
+  env: {},
+  cleanup: async () => {},
+};
+
+export function buildGeminiToolSettings(
+  toolConfig: GeminiToolConfig,
+): { tools: { core?: string[]; exclude?: string[] } } | undefined {
+  const tools: { core?: string[]; exclude?: string[] } = {};
+
+  if (toolConfig.allowedTools.length > 0) {
+    tools.core = toolConfig.allowedTools;
+  }
+  if (toolConfig.disallowedTools.length > 0) {
+    tools.exclude = toolConfig.disallowedTools;
+  }
+
+  if (!tools.core && !tools.exclude) {
+    return undefined;
+  }
+
+  return { tools };
+}
+
+async function defaultCreateSettingsOverride(
+  toolConfig: GeminiToolConfig,
+): Promise<GeminiSettingsOverride> {
+  const settings = buildGeminiToolSettings(toolConfig);
+  if (!settings) {
+    return NOOP_SETTINGS_OVERRIDE;
+  }
+
+  const dir = await mkdtemp(join(tmpdir(), 'cligent-gemini-'));
+  const filePath = join(dir, 'settings.json');
+  await writeFile(filePath, `${JSON.stringify(settings)}\n`, 'utf8');
+
+  return {
+    env: {
+      GEMINI_CLI_SYSTEM_SETTINGS_PATH: filePath,
+    },
+    cleanup: async () => {
+      await rm(dir, { recursive: true, force: true });
+    },
+  };
 }
 
 export function mapPermissionsToGeminiToolConfig(
@@ -295,9 +352,6 @@ export function mapPermissionsToGeminiToolConfig(
   const args: string[] = [];
   if (allowedTools.length > 0) {
     args.push('--allowed-tools', allowedTools.join(','));
-  }
-  if (disallowedTools.length > 0) {
-    args.push('--disallowed-tools', disallowedTools.join(','));
   }
 
   return {
@@ -389,9 +443,15 @@ export class GeminiAdapter implements AgentAdapter {
 
   private readonly probeAvailability: () => Promise<boolean>;
 
+  private readonly createSettingsOverride: (
+    toolConfig: GeminiToolConfig,
+  ) => Promise<GeminiSettingsOverride>;
+
   constructor(deps: GeminiAdapterDeps = {}) {
     this.spawnProcess = deps.spawnProcess ?? defaultSpawnProcess;
     this.probeAvailability = deps.probeAvailability ?? defaultProbeAvailability;
+    this.createSettingsOverride =
+      deps.createSettingsOverride ?? defaultCreateSettingsOverride;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -407,6 +467,7 @@ export class GeminiAdapter implements AgentAdapter {
     let processExited = false;
     let child: ChildProcessWithoutNullStreams | undefined;
     let closePromise: Promise<CloseResult> | undefined;
+    let settingsOverride: GeminiSettingsOverride = NOOP_SETTINGS_OVERRIDE;
 
     const startTime = Date.now();
     let sessionId = options?.resume ?? generateSessionId();
@@ -430,10 +491,20 @@ export class GeminiAdapter implements AgentAdapter {
     }
 
     try {
+      settingsOverride = await this.createSettingsOverride(mapped.toolConfig);
+      const spawnOptions: SpawnOptionsWithoutStdio = {
+        ...mapped.spawnOptions,
+        env: {
+          ...process.env,
+          ...(mapped.spawnOptions.env ?? {}),
+          ...settingsOverride.env,
+        },
+      };
+
       child = this.spawnProcess(
         mapped.command,
         mapped.args,
-        mapped.spawnOptions,
+        spawnOptions,
       );
 
       const processRef = child;
@@ -732,6 +803,8 @@ export class GeminiAdapter implements AgentAdapter {
           }
         }
       }
+
+      await settingsOverride.cleanup();
     }
   }
 }
