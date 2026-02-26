@@ -7,13 +7,17 @@
 
 Implement the Codex adapter using `@openai/codex-sdk`, normalizing Codex events to the Unified Event Stream and mapping UPM capabilities to Codex's sandbox and approval controls — per [DR-001](../decisions/001-unified-cli-agent-interface-architecture.md#codex-via-sdk) and [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md).
 
+## Status
+
+Done
+
 ## Deliverables
 
-- [ ] `src/adapters/codex.ts` — `CodexAdapter` implementing `AgentAdapter`
-- [ ] Sub-path export: `cligent/adapters/codex`
-- [ ] `@openai/codex-sdk` as optional peer dependency
-- [ ] Extension events: `codex:file_change`
-- [ ] Unit tests with mocked SDK
+- [x] `src/adapters/codex.ts` — `CodexAdapter` implementing `AgentAdapter`
+- [x] Sub-path export: `cligent/adapters/codex`
+- [x] `@openai/codex-sdk` as optional peer dependency
+- [x] Extension events: `codex:file_change`
+- [x] Unit tests with mocked SDK
 
 ## Tasks
 

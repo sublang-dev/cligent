@@ -14,6 +14,10 @@
     "./adapters/claude-code": {
       "import": "./dist/adapters/claude-code.js",
       "types": "./dist/adapters/claude-code.d.ts"
+    },
+    "./adapters/codex": {
+      "import": "./dist/adapters/codex.js",
+      "types": "./dist/adapters/codex.d.ts"
     }
   },
   "engines": {
@@ -26,10 +30,14 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "*"
+    "@anthropic-ai/claude-agent-sdk": "*",
+    "@openai/codex-sdk": "*"
   },
   "peerDependenciesMeta": {
     "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    },
+    "@openai/codex-sdk": {
       "optional": true
     }
   },
