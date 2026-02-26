@@ -10,6 +10,10 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./adapters/claude-code": {
+      "import": "./dist/adapters/claude-code.js",
+      "types": "./dist/adapters/claude-code.d.ts"
     }
   },
   "engines": {
@@ -20,6 +24,14 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "*"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/claude-agent-sdk": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^25.3.0",

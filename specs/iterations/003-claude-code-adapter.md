@@ -7,12 +7,16 @@
 
 Implement the Claude Code adapter using `@anthropic-ai/claude-agent-sdk`, normalizing SDK messages to the Unified Event Stream and mapping UPM capabilities to Claude Code's permission system — per [DR-001](../decisions/001-unified-cli-agent-interface-architecture.md#claude-code-via-agent-sdk) and [DR-002](../decisions/002-unified-event-stream-and-adapter-interface.md).
 
+## Status
+
+Done
+
 ## Deliverables
 
-- [ ] `src/adapters/claude-code.ts` — `ClaudeCodeAdapter` implementing `AgentAdapter`
-- [ ] Sub-path export: `cligent/adapters/claude-code`
-- [ ] `@anthropic-ai/claude-agent-sdk` as optional peer dependency
-- [ ] Unit tests with mocked SDK
+- [x] `src/adapters/claude-code.ts` — `ClaudeCodeAdapter` implementing `AgentAdapter`
+- [x] Sub-path export: `cligent/adapters/claude-code`
+- [x] `@anthropic-ai/claude-agent-sdk` as optional peer dependency
+- [x] Unit tests with mocked SDK
 
 ## Tasks
 
