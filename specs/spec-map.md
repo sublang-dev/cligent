@@ -46,6 +46,7 @@ Authoring rules: [dev/style.md](dev/style.md).
 | File | Summary |
 | --- | --- |
 | [git.md](dev/git.md) | Commit message format and AI co-authorship trailers |
+| [package.md](dev/package.md) | Package/TS config, exports map, dependency constraints |
 | [style.md](dev/style.md) | Spec naming, ID format, GEARS syntax, cross-refs, record format, and SPDX headers |
 
 ### `user/`
@@ -53,9 +54,17 @@ Authoring rules: [dev/style.md](dev/style.md).
 | File | Summary |
 | --- | --- |
 | [meta.md](user/meta.md) | GEARS syntax definition and test-spec mapping |
+| [engine.md](user/engine.md) | Registry CRUD, runAgent(), runParallel(), event helpers, done semantics |
+| [ndjson.md](user/ndjson.md) | parseNDJSON() behavioral contract |
+| [adapters/claude-code.md](user/adapters/claude-code.md) | Claude Code adapter: SDK normalization, UPM mapping, options mapping |
+| [adapters/codex.md](user/adapters/codex.md) | Codex adapter: SDK normalization, UPM mapping, thread resumption |
+| [adapters/gemini.md](user/adapters/gemini.md) | Gemini adapter: NDJSON normalization, exit codes, process lifecycle |
+| [adapters/opencode.md](user/adapters/opencode.md) | OpenCode adapter: SSE normalization, two modes, session filtering, server lifecycle |
 
 ### `test/`
 
 | File | Summary |
 | --- | --- |
 | [spdx-headers.md](test/spdx-headers.md) | Copyright and license header presence checks |
+| [engine.md](test/engine.md) | Engine and registry verification criteria |
+| [adapters.md](test/adapters.md) | Adapter verification criteria (shared + per-adapter) |
